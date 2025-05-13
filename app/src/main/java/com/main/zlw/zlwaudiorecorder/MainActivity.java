@@ -4,7 +4,6 @@ import android.content.Intent;
 import android.media.AudioFormat;
 import android.os.Bundle;
 import android.os.Environment;
-import android.support.v7.app.AppCompatActivity;
 import android.view.View;
 import android.widget.AdapterView;
 import android.widget.ArrayAdapter;
@@ -13,6 +12,8 @@ import android.widget.RadioGroup;
 import android.widget.Spinner;
 import android.widget.TextView;
 import android.widget.Toast;
+
+import androidx.appcompat.app.AppCompatActivity;
 
 import com.main.zlw.zlwaudiorecorder.base.MyApp;
 import com.yanzhenjie.permission.AndPermission;
@@ -29,32 +30,19 @@ import com.zlw.main.recorderlib.recorder.listener.RecordStateListener;
 import java.io.File;
 import java.util.Locale;
 
-import butterknife.BindView;
-import butterknife.ButterKnife;
-import butterknife.OnClick;
 
 public class MainActivity extends AppCompatActivity implements AdapterView.OnItemSelectedListener {
     private static final String TAG = MainActivity.class.getSimpleName();
 
-    @BindView(R.id.btRecord)
     Button btRecord;
-    @BindView(R.id.btStop)
     Button btStop;
-    @BindView(R.id.tvState)
     TextView tvState;
-    @BindView(R.id.tvSoundSize)
     TextView tvSoundSize;
-    @BindView(R.id.rgAudioFormat)
     RadioGroup rgAudioFormat;
-    @BindView(R.id.rgSimpleRate)
     RadioGroup rgSimpleRate;
-    @BindView(R.id.tbEncoding)
     RadioGroup tbEncoding;
-    @BindView(R.id.audioView)
     AudioView audioView;
-    @BindView(R.id.spUpStyle)
     Spinner spUpStyle;
-    @BindView(R.id.spDownStyle)
     Spinner spDownStyle;
 
     private boolean isStart = false;
@@ -66,7 +54,7 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
-        ButterKnife.bind(this);
+        initView();
         initAudioView();
         initEvent();
         initRecord();
@@ -75,6 +63,19 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
                 .permission(new String[]{Permission.READ_EXTERNAL_STORAGE, Permission.WRITE_EXTERNAL_STORAGE,
                         Permission.RECORD_AUDIO})
                 .start();
+    }
+
+    private void initView() {
+        btRecord = findViewById(R.id.btRecord);
+        btStop = findViewById(R.id.btStop);
+        tvState = findViewById(R.id.tvState);
+        tvSoundSize = findViewById(R.id.tvSoundSize);
+        rgAudioFormat = findViewById(R.id.rgAudioFormat);
+        rgSimpleRate = findViewById(R.id.rgSimpleRate);
+        tbEncoding = findViewById(R.id.tbEncoding);
+        audioView = findViewById(R.id.audioView);
+        spUpStyle = findViewById(R.id.spUpStyle);
+        spDownStyle = findViewById(R.id.spDownStyle);
     }
 
     @Override
@@ -218,8 +219,7 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
         });
     }
 
-    @OnClick({R.id.btRecord, R.id.btStop, R.id.jumpTestActivity})
-    public void onViewClicked(View view) {
+    public void onClicked(View view) {
         switch (view.getId()) {
             case R.id.btRecord:
                 doPlay();
