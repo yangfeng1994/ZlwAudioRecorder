@@ -254,7 +254,13 @@ public class RecordHelper {
         private AudioRecord audioRecord;
         private int bufferSize;
 
-        byte[] noiceBuffer;
+        // 类成员变量复用缓冲区（非线程安全）
+        private final short[] mProcessInput = new short[160];  // 降噪输入缓冲
+        private final short[] mNsOutput = new short[160];     // 降噪输出
+        private final short[] mAgcOutput = new short[160];    // 增益输出
+        // 类成员变量复用缓冲区（线程不安全，需确保单线程访问）
+        private final short[] mInputShorts = new short[160];  // 输入缓冲
+        private final byte[] mProcessBuffer = new byte[320]; // 字节转换缓冲
 
         AudioRecordThread() {
             bufferSize = AudioRecord.getMinBufferSize(currentConfig.getSampleRate(),
@@ -262,7 +268,6 @@ public class RecordHelper {
             Logger.d(TAG, "record buffer size = %s", bufferSize);
             audioRecord = new AudioRecord(MediaRecorder.AudioSource.MIC, currentConfig.getSampleRate(),
                     currentConfig.getChannelConfig(), currentConfig.getEncodingConfig(), bufferSize);
-            noiceBuffer = new byte[bufferSize];
             if (currentConfig.getFormat() == RecordConfig.RecordFormat.MP3) {
                 if (mp3EncodeThread == null) {
                     initMp3EncoderThread(bufferSize);
@@ -285,14 +290,6 @@ public class RecordHelper {
                     break;
             }
         }
-
-        // 类成员变量复用缓冲区（非线程安全）
-        private final short[] mProcessInput = new short[160];  // 降噪输入缓冲
-        private final short[] mNsOutput = new short[160];     // 降噪输出
-        private final short[] mAgcOutput = new short[160];    // 增益输出
-        // 类成员变量复用缓冲区（线程不安全，需确保单线程访问）
-        private final short[] mInputShorts = new short[160];  // 输入缓冲
-        private final byte[] mProcessBuffer = new byte[320]; // 字节转换缓冲
 
         private void startMp3Recorder() {
             state = RecordState.RECORDING;
