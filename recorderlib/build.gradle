@@ -2,7 +2,7 @@ apply plugin: 'com.android.library'
 apply plugin: 'maven-publish'
 
 android {
-    compileSdkVersion 35
+    compileSdkVersion project.libCompileSdkVersion.toInteger()
 
     defaultConfig {
 
