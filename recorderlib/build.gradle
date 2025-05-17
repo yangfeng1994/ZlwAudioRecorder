@@ -2,13 +2,14 @@ apply plugin: 'com.android.library'
 apply plugin: 'maven-publish'
 
 android {
-    compileSdkVersion 32
+    compileSdkVersion 35
 
     defaultConfig {
-        minSdkVersion 21
-        targetSdkVersion 32
-        versionCode 1
-        versionName "1.0"
+
+        minSdkVersion project.libMinSdkVersion.toInteger()
+        targetSdkVersion project.libCargetSdkVersion.toInteger()
+        versionCode project.libVersioCode.toInteger()  // 可选：动态控制
+        versionName project.libVersionName  // 使用全局变量
 
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
     }
@@ -28,7 +29,6 @@ android {
 dependencies {
     implementation fileTree(dir: 'libs', include: ['*.jar'])
     api project(':lib-speech')
-    api "com.blankj:utilcodex:1.30.5"
 
     implementation 'androidx.appcompat:appcompat:1.1.0'
     testImplementation 'junit:junit:4.13.2'
@@ -39,19 +39,11 @@ dependencies {
 afterEvaluate {
     publishing {
         publications {
-            // Creates a Maven publication called "release".
-            group = 'com.github.yangfeng1994'
-            version = '1.0.23'
-            //发布release版本
             release(MavenPublication) {
-                // Applies the component for the release build variant.
                 from components.release
-                //groupId通常是自己的gitee或者GitHub的账户地址
-                groupId = group
-                //artifactId通常是指待发布项目的名称，也就是别名
-                artifactId = 'ZlwAudioRecorder'
-                //version通常是指待发布项目的版本号，这里是写死的，通常我们取项目versionName
-                version = version
+                groupId = project.mavenGroupId
+                artifactId = 'recorderlib'  // 与模块名一致
+                version = android.defaultConfig.versionName
             }
         }
     }
