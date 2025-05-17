@@ -294,7 +294,7 @@ public class RecordHelper {
 
                 while (state == RecordState.RECORDING) {
                     int end = audioRecord.read(byteBuffer, 0, byteBuffer.length);
-                    Log.e("yyyyy", "end " + end+"  byteBuffer.length: " + byteBuffer.length);
+                    Log.e("yyyyy", "end " + end + "  byteBuffer.length: " + byteBuffer.length);
                     if (mp3EncodeThread != null) {
                         mp3EncodeThread.addChangeBuffer(new Mp3EncodeThread.ChangeBuffer(byteBuffer, end));
                     }
@@ -321,15 +321,50 @@ public class RecordHelper {
             try {
                 audioRecord.startRecording();
                 long nsxId = nsUtils.nsxCreate();
-                int nsxInit = nsUtils.nsxInit(nsxId, 16000);
+                long nsxInit = nsUtils.nsxInit(nsxId, 16000);
                 int nexSetPolicy = nsUtils.nsxSetPolicy(nsxId, 2);
+                Log.i("yyyyyy", "nsxId :" + nsxId + "  nsxInit: " + nsxInit + " nexSetPolicy: " + nexSetPolicy);
                 long agcId = agcUtils.agcCreate();
+                int agcInitResult = agcUtils.agcInit(agcId, 0, 255, 3, 16000);
+                int agcSetConfigResult = agcUtils.agcSetConfig(agcId, (short) 9, (short) 9, true);
+                Log.e(
+                        "yyyyyy",
+                        "agcId : " + agcId + "  agcInit: " + agcInitResult + " agcSetConfig: " + agcSetConfigResult
+                );
+
                 byte[] byteBuffer = new byte[bufferSize];
                 while (state == RecordState.RECORDING) {
                     int readSize = audioRecord.read(byteBuffer, 0, byteBuffer.length);
                     notifyData(byteBuffer);
                     if (readSize > 0) {
-                        noiseAudio(byteBuffer, nsxId, agcId, tmpFile);
+                        int index = 0;
+                        while (true) {
+                            if (index >= byteBuffer.length) {
+                                break;
+                            }
+                            int end = index + 320;
+                            if (end > byteBuffer.length) {
+                                break;
+                            }
+                            byte[] output = ArrayUtils.subArray(byteBuffer, index, end);
+                            short[] inputData = new short[160];
+                            short[] outNsData = new short[160];
+                            short[] outAgcData = new short[160];
+                            ByteBuffer.wrap(output).order(ByteOrder.LITTLE_ENDIAN).asShortBuffer().get(inputData);
+                            nsUtils.nsxProcess(nsxId, inputData, 1, outNsData);
+                            agcUtils.agcProcess(agcId, outNsData, 1, 160, outAgcData,
+                                    0, 0, 0, false);
+                            byte[] outDatas = new byte[320];
+                            for (int i = 0; i < outAgcData.length; i++) {
+                                short outAgcDatum = outAgcData[i];
+                                byte high = (byte) ((0xFF00 & outAgcDatum) >> 8);//定义第一个byte
+                                byte low = (byte) (0x00FF & outAgcDatum);
+                                outDatas[i * 2 + 1] = high;
+                                outDatas[i * 2] = low;
+                            }
+                            FileIOUtils.writeFileFromBytesByStream(tmpFile, outDatas, true);
+                            index += 320;
+                        }
                     }
                 }
                 audioRecord.stop();
@@ -349,39 +384,6 @@ public class RecordHelper {
                 Logger.d(TAG, "录音结束");
             }
         }
-
-        //降噪
-        private void noiseAudio(byte[] buffer, long nsxId, long agcId, File file) {
-            int index = 0;
-            while (true) {
-                if (index >= buffer.length) {
-                    break;
-                }
-                int end = index + 320;
-                if (end > buffer.length) {
-                    break;
-                }
-                byte[] output = ArrayUtils.subArray(buffer, index, end);
-                short[] inputData = new short[160];
-                short[] outNsData = new short[160];
-                short[] outAgcData = new short[160];
-                ByteBuffer.wrap(output).order(ByteOrder.LITTLE_ENDIAN).asShortBuffer().get(inputData);
-                nsUtils.nsxProcess(nsxId, inputData, 1, outNsData);
-                agcUtils.agcProcess(agcId, outNsData, 1, 160, outAgcData,
-                        0, 0, 0, false);
-                byte[] outDatas = new byte[320];
-                for (int i = 0; i < outAgcData.length; i++) {
-                    short outAgcDatum = outAgcData[i];
-                    byte high = (byte) ((0xFF00 & outAgcDatum) >> 8);//定义第一个byte
-                    byte low = (byte) (0x00FF & outAgcDatum);
-                    outDatas[i * 2 + 1] = high;
-                    outDatas[i * 2] = low;
-                }
-                FileIOUtils.writeFileFromBytesByStream(file, outDatas, true);
-                index += 320;
-            }
-        }
-
     }
 
     private void stopMp3Encoded() {
