@@ -5,6 +5,7 @@ import android.media.MediaRecorder;
 import android.os.Handler;
 import android.os.Looper;
 import android.util.Log;
+import android.util.Pair;
 
 import com.blankj.utilcode.util.ArrayUtils;
 import com.blankj.utilcode.util.FileIOUtils;
@@ -285,41 +286,79 @@ public class RecordHelper {
             }
         }
 
+        // 类成员变量复用缓冲区（非线程安全）
+        private final short[] mProcessInput = new short[160];  // 降噪输入缓冲
+        private final short[] mNsOutput = new short[160];     // 降噪输出
+        private final short[] mAgcOutput = new short[160];    // 增益输出
+        // 类成员变量复用缓冲区（线程不安全，需确保单线程访问）
+        private final short[] mInputShorts = new short[160];  // 输入缓冲
+        private final byte[] mProcessBuffer = new byte[320]; // 字节转换缓冲
+
         private void startMp3Recorder() {
             state = RecordState.RECORDING;
             notifyState();
-
+            Pair<Long, Long> result = getInitNoise();
+            Long nsxId = result.first;
+            Long agcId = result.second;
             try {
                 audioRecord.startRecording();
-                short[] byteBuffer = new short[bufferSize];
+                short[] rawBuffer = new short[bufferSize];  // 确保bufferSize是160的整数倍
 
                 while (state == RecordState.RECORDING) {
-                    int end = audioRecord.read(byteBuffer, 0, byteBuffer.length);
-                    Log.e("yyyyy", "end " + end + "  byteBuffer.length: " + byteBuffer.length);
-                    if (mp3EncodeThread != null) {
-                        mp3EncodeThread.addChangeBuffer(new Mp3EncodeThread.ChangeBuffer(byteBuffer, end));
+                    int readCount = audioRecord.read(rawBuffer, 0, rawBuffer.length);
+                    if (readCount > 0) {
+                        notifyData(ByteUtils.toBytes(rawBuffer));
+                        // 关键优化：原地降噪处理
+                        processForMp3(rawBuffer, readCount, nsxId, agcId);
+
+                        // 传递给MP3编码器
+                        if (mp3EncodeThread != null) {
+                            mp3EncodeThread.addChangeBuffer(
+                                    new Mp3EncodeThread.ChangeBuffer(rawBuffer, readCount)
+                            );
+                        }
                     }
-                    notifyData(ByteUtils.toBytes(byteBuffer));
                 }
                 audioRecord.stop();
             } catch (Exception e) {
                 Logger.e(e, TAG, e.getMessage());
                 notifyError("录音失败");
-            }
-            if (state != RecordState.PAUSE) {
-                state = RecordState.IDLE;
-                notifyState();
-                stopMp3Encoded();
-            } else {
-                Logger.d(TAG, "暂停");
+            } finally {
+                // 释放资源
+                nsUtils.nsxFree(nsxId);
+                agcUtils.agcFree(agcId);
+                if (state != RecordState.PAUSE) {
+                    state = RecordState.IDLE;
+                    notifyState();
+                    stopMp3Encoded();
+                } else {
+                    Logger.d(TAG, "暂停");
+                }
             }
         }
 
-        // 类成员变量复用缓冲区（线程不安全，需确保单线程访问）
-        private final short[] mInputShorts = new short[160];  // 输入缓冲
-        private final short[] mNsOutput = new short[160];    // 降噪输出
-        private final short[] mAgcOutput = new short[160];    // 增益输出
-        private final byte[] mProcessBuffer = new byte[320]; // 字节转换缓冲
+        /**
+         * 执行实时降噪处理（原地修改原始缓冲区）
+         */
+        private void processForMp3(short[] buffer, int validLength, long nsxId, long agcId) {
+            int processed = 0;
+            while (processed < validLength) {
+                int blockSize = Math.min(160, validLength - processed);
+
+                // 1. 填充处理缓冲区（自动补零）
+                System.arraycopy(buffer, processed, mProcessInput, 0, blockSize);
+                if (blockSize < 160) {
+                    Arrays.fill(mProcessInput, blockSize, 160, (short) 0);
+                }
+
+                // 2. 执行降噪和增益
+                nsUtils.nsxProcess(nsxId, mProcessInput, 1, mNsOutput);
+                agcUtils.agcProcess(agcId, mNsOutput, 1, 160, mAgcOutput, 0, 0, 0, false);
+                // 3. 写回原始缓冲区（实现零拷贝）
+                System.arraycopy(mAgcOutput, 0, buffer, processed, blockSize);
+                processed += blockSize;
+            }
+        }
 
         private void startPcmRecorder() {
             state = RecordState.RECORDING;
@@ -329,16 +368,10 @@ public class RecordHelper {
             // 使用 BufferedOutputStream 提升写入性能（缓冲区大小8KB）
             try (BufferedOutputStream bos = new BufferedOutputStream(
                     new FileOutputStream(tmpFile), 8192)) {
-
                 audioRecord.startRecording();
-                // 初始化音频处理器
-                long nsxId = nsUtils.nsxCreate();
-                nsUtils.nsxInit(nsxId, 16000);
-                nsUtils.nsxSetPolicy(nsxId, 2);
-                long agcId = agcUtils.agcCreate();
-                agcUtils.agcInit(agcId, 0, 255, 3, 16000);
-                agcUtils.agcSetConfig(agcId, (short) 9, (short) 9, true);
-
+                Pair<Long, Long> result = getInitNoise();
+                Long nsxId = result.first;
+                Long agcId = result.second;
                 byte[] byteBuffer = new byte[bufferSize]; // 主录音缓冲区
                 while (state == RecordState.RECORDING) {
                     int readSize = audioRecord.read(byteBuffer, 0, byteBuffer.length);
@@ -366,6 +399,17 @@ public class RecordHelper {
                     Logger.d(TAG, "录音结束");
                 }
             }
+        }
+
+        private Pair<Long, Long> getInitNoise() {
+            // 初始化音频处理器
+            long nsxId = nsUtils.nsxCreate();
+            nsUtils.nsxInit(nsxId, 16000);
+            nsUtils.nsxSetPolicy(nsxId, 2);
+            long agcId = agcUtils.agcCreate();
+            agcUtils.agcInit(agcId, 0, 255, 3, 16000);
+            agcUtils.agcSetConfig(agcId, (short) 9, (short) 9, true);
+            return new Pair(nsxId, agcId);
         }
 
         /**
