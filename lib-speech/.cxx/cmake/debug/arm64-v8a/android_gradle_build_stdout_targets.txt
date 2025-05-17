@@ -1,2 +1,0 @@
-ninja: Entering directory `/Users/yangfeng/work/android/formal/ZlwAudioRecorder/lib-speech/.cxx/cmake/debug/arm64-v8a'
-ninja: no work to do.
