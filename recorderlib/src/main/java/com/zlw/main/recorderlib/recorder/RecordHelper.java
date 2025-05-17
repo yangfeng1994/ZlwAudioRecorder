@@ -2,10 +2,14 @@ package com.zlw.main.recorderlib.recorder;
 
 import android.media.AudioRecord;
 import android.media.MediaRecorder;
-import android.os.Environment;
 import android.os.Handler;
 import android.os.Looper;
+import android.util.Log;
 
+import com.blankj.utilcode.util.ArrayUtils;
+import com.blankj.utilcode.util.FileIOUtils;
+import com.hank.voice.AutomaticGainControl;
+import com.hank.voice.NoiseSuppressor;
 import com.zlw.main.recorderlib.recorder.listener.RecordDataListener;
 import com.zlw.main.recorderlib.recorder.listener.RecordFftDataListener;
 import com.zlw.main.recorderlib.recorder.listener.RecordResultListener;
@@ -23,6 +27,8 @@ import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.IOException;
+import java.nio.ByteBuffer;
+import java.nio.ByteOrder;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.List;
@@ -52,6 +58,8 @@ public class RecordHelper {
     private File tmpFile = null;
     private List<File> files = new ArrayList<>();
     private Mp3EncodeThread mp3EncodeThread;
+    private NoiseSuppressor nsUtils = new NoiseSuppressor();
+    private AutomaticGainControl agcUtils = new AutomaticGainControl();
 
     private RecordHelper() {
     }
@@ -201,22 +209,18 @@ public class RecordHelper {
         if (recordDataListener == null && recordSoundSizeListener == null && recordFftDataListener == null) {
             return;
         }
-        mainHandler.post(new Runnable() {
-            @Override
-            public void run() {
-                if (recordDataListener != null) {
-                    recordDataListener.onData(data);
-                }
-
-                if (recordFftDataListener != null || recordSoundSizeListener != null) {
-                    byte[] fftData = fftFactory.makeFftData(data);
-                    if (fftData != null) {
-                        if (recordSoundSizeListener != null) {
-                            recordSoundSizeListener.onSoundSize(getDb(fftData));
-                        }
-                        if (recordFftDataListener != null) {
-                            recordFftDataListener.onFftData(fftData);
-                        }
+        mainHandler.post(() -> {
+            if (recordDataListener != null) {
+                recordDataListener.onData(data);
+            }
+            if (recordFftDataListener != null || recordSoundSizeListener != null) {
+                byte[] fftData = fftFactory.makeFftData(data);
+                if (fftData != null) {
+                    if (recordSoundSizeListener != null) {
+                        recordSoundSizeListener.onSoundSize(getDb(fftData));
+                    }
+                    if (recordFftDataListener != null) {
+                        recordFftDataListener.onFftData(fftData);
                     }
                 }
             }
@@ -248,12 +252,15 @@ public class RecordHelper {
         private AudioRecord audioRecord;
         private int bufferSize;
 
+        byte[] noiceBuffer;
+
         AudioRecordThread() {
             bufferSize = AudioRecord.getMinBufferSize(currentConfig.getSampleRate(),
                     currentConfig.getChannelConfig(), currentConfig.getEncodingConfig()) * RECORD_AUDIO_BUFFER_TIMES;
             Logger.d(TAG, "record buffer size = %s", bufferSize);
             audioRecord = new AudioRecord(MediaRecorder.AudioSource.MIC, currentConfig.getSampleRate(),
                     currentConfig.getChannelConfig(), currentConfig.getEncodingConfig(), bufferSize);
+            noiceBuffer = new byte[bufferSize];
             if (currentConfig.getFormat() == RecordConfig.RecordFormat.MP3) {
                 if (mp3EncodeThread == null) {
                     initMp3EncoderThread(bufferSize);
@@ -277,48 +284,6 @@ public class RecordHelper {
             }
         }
 
-        private void startPcmRecorder() {
-            state = RecordState.RECORDING;
-            notifyState();
-            Logger.d(TAG, "开始录制 Pcm");
-            FileOutputStream fos = null;
-            try {
-                fos = new FileOutputStream(tmpFile);
-                audioRecord.startRecording();
-                byte[] byteBuffer = new byte[bufferSize];
-
-                while (state == RecordState.RECORDING) {
-                    int end = audioRecord.read(byteBuffer, 0, byteBuffer.length);
-                    notifyData(byteBuffer);
-                    fos.write(byteBuffer, 0, end);
-                    fos.flush();
-                }
-                audioRecord.stop();
-                files.add(tmpFile);
-                if (state == RecordState.STOP) {
-                    makeFile();
-                } else {
-                    Logger.i(TAG, "暂停！");
-                }
-            } catch (Exception e) {
-                Logger.e(e, TAG, e.getMessage());
-                notifyError("录音失败");
-            } finally {
-                try {
-                    if (fos != null) {
-                        fos.close();
-                    }
-                } catch (IOException e) {
-                    e.printStackTrace();
-                }
-            }
-            if (state != RecordState.PAUSE) {
-                state = RecordState.IDLE;
-                notifyState();
-                Logger.d(TAG, "录音结束");
-            }
-        }
-
         private void startMp3Recorder() {
             state = RecordState.RECORDING;
             notifyState();
@@ -329,6 +294,7 @@ public class RecordHelper {
 
                 while (state == RecordState.RECORDING) {
                     int end = audioRecord.read(byteBuffer, 0, byteBuffer.length);
+                    Log.e("yyyyy", "end " + end+"  byteBuffer.length: " + byteBuffer.length);
                     if (mp3EncodeThread != null) {
                         mp3EncodeThread.addChangeBuffer(new Mp3EncodeThread.ChangeBuffer(byteBuffer, end));
                     }
@@ -347,6 +313,75 @@ public class RecordHelper {
                 Logger.d(TAG, "暂停");
             }
         }
+
+        private void startPcmRecorder() {
+            state = RecordState.RECORDING;
+            notifyState();
+            Logger.d(TAG, "开始录制 Pcm");
+            try {
+                audioRecord.startRecording();
+                long nsxId = nsUtils.nsxCreate();
+                int nsxInit = nsUtils.nsxInit(nsxId, 16000);
+                int nexSetPolicy = nsUtils.nsxSetPolicy(nsxId, 2);
+                long agcId = agcUtils.agcCreate();
+                byte[] byteBuffer = new byte[bufferSize];
+                while (state == RecordState.RECORDING) {
+                    int readSize = audioRecord.read(byteBuffer, 0, byteBuffer.length);
+                    notifyData(byteBuffer);
+                    if (readSize > 0) {
+                        noiseAudio(byteBuffer, nsxId, agcId, tmpFile);
+                    }
+                }
+                audioRecord.stop();
+                files.add(tmpFile);
+                if (state == RecordState.STOP) {
+                    makeFile();
+                } else {
+                    Logger.i(TAG, "暂停！");
+                }
+            } catch (Exception e) {
+                Logger.e(e, TAG, e.getMessage());
+                notifyError("录音失败");
+            }
+            if (state != RecordState.PAUSE) {
+                state = RecordState.IDLE;
+                notifyState();
+                Logger.d(TAG, "录音结束");
+            }
+        }
+
+        //降噪
+        private void noiseAudio(byte[] buffer, long nsxId, long agcId, File file) {
+            int index = 0;
+            while (true) {
+                if (index >= buffer.length) {
+                    break;
+                }
+                int end = index + 320;
+                if (end > buffer.length) {
+                    break;
+                }
+                byte[] output = ArrayUtils.subArray(buffer, index, end);
+                short[] inputData = new short[160];
+                short[] outNsData = new short[160];
+                short[] outAgcData = new short[160];
+                ByteBuffer.wrap(output).order(ByteOrder.LITTLE_ENDIAN).asShortBuffer().get(inputData);
+                nsUtils.nsxProcess(nsxId, inputData, 1, outNsData);
+                agcUtils.agcProcess(agcId, outNsData, 1, 160, outAgcData,
+                        0, 0, 0, false);
+                byte[] outDatas = new byte[320];
+                for (int i = 0; i < outAgcData.length; i++) {
+                    short outAgcDatum = outAgcData[i];
+                    byte high = (byte) ((0xFF00 & outAgcDatum) >> 8);//定义第一个byte
+                    byte low = (byte) (0x00FF & outAgcDatum);
+                    outDatas[i * 2 + 1] = high;
+                    outDatas[i * 2] = low;
+                }
+                FileIOUtils.writeFileFromBytesByStream(file, outDatas, true);
+                index += 320;
+            }
+        }
+
     }
 
     private void stopMp3Encoded() {

@@ -1,1 +1,2 @@
 include ':app', ':recorderlib'
+include ':lib-speech'

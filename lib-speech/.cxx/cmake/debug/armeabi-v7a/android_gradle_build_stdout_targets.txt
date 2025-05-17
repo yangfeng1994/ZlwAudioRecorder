@@ -1,0 +1,2 @@
+ninja: Entering directory `/Users/yangfeng/work/android/formal/ZlwAudioRecorder/lib-speech/.cxx/cmake/debug/armeabi-v7a'
+ninja: no work to do.

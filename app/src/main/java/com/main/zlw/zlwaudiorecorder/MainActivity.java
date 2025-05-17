@@ -58,6 +58,9 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
         initAudioView();
         initEvent();
         initRecord();
+       boolean hasPerm= AndPermission.hasPermissions(this, Permission.READ_EXTERNAL_STORAGE, Permission.WRITE_EXTERNAL_STORAGE,
+                Permission.RECORD_AUDIO);
+       Logger.d("yyyyyy"," hasPerm  "+hasPerm);
         AndPermission.with(this)
                 .runtime()
                 .permission(new String[]{Permission.READ_EXTERNAL_STORAGE, Permission.WRITE_EXTERNAL_STORAGE,
