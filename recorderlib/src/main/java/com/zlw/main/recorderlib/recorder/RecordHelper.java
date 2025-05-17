@@ -31,6 +31,7 @@ import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Locale;
 
@@ -314,59 +315,39 @@ public class RecordHelper {
             }
         }
 
+        // 类成员变量复用缓冲区（线程不安全，需确保单线程访问）
+        private final short[] mInputShorts = new short[160];  // 输入缓冲
+        private final short[] mNsOutput = new short[160];    // 降噪输出
+        private final short[] mAgcOutput = new short[160];    // 增益输出
+        private final byte[] mProcessBuffer = new byte[320]; // 字节转换缓冲
+
         private void startPcmRecorder() {
             state = RecordState.RECORDING;
             notifyState();
             Logger.d(TAG, "开始录制 Pcm");
-            try {
-                audioRecord.startRecording();
-                long nsxId = nsUtils.nsxCreate();
-                long nsxInit = nsUtils.nsxInit(nsxId, 16000);
-                int nexSetPolicy = nsUtils.nsxSetPolicy(nsxId, 2);
-                Log.i("yyyyyy", "nsxId :" + nsxId + "  nsxInit: " + nsxInit + " nexSetPolicy: " + nexSetPolicy);
-                long agcId = agcUtils.agcCreate();
-                int agcInitResult = agcUtils.agcInit(agcId, 0, 255, 3, 16000);
-                int agcSetConfigResult = agcUtils.agcSetConfig(agcId, (short) 9, (short) 9, true);
-                Log.e(
-                        "yyyyyy",
-                        "agcId : " + agcId + "  agcInit: " + agcInitResult + " agcSetConfig: " + agcSetConfigResult
-                );
 
-                byte[] byteBuffer = new byte[bufferSize];
+            // 使用 BufferedOutputStream 提升写入性能（缓冲区大小8KB）
+            try (BufferedOutputStream bos = new BufferedOutputStream(
+                    new FileOutputStream(tmpFile), 8192)) {
+
+                audioRecord.startRecording();
+                // 初始化音频处理器
+                long nsxId = nsUtils.nsxCreate();
+                nsUtils.nsxInit(nsxId, 16000);
+                nsUtils.nsxSetPolicy(nsxId, 2);
+                long agcId = agcUtils.agcCreate();
+                agcUtils.agcInit(agcId, 0, 255, 3, 16000);
+                agcUtils.agcSetConfig(agcId, (short) 9, (short) 9, true);
+
+                byte[] byteBuffer = new byte[bufferSize]; // 主录音缓冲区
                 while (state == RecordState.RECORDING) {
                     int readSize = audioRecord.read(byteBuffer, 0, byteBuffer.length);
                     notifyData(byteBuffer);
                     if (readSize > 0) {
-                        int index = 0;
-                        while (true) {
-                            if (index >= byteBuffer.length) {
-                                break;
-                            }
-                            int end = index + 320;
-                            if (end > byteBuffer.length) {
-                                break;
-                            }
-                            byte[] output = ArrayUtils.subArray(byteBuffer, index, end);
-                            short[] inputData = new short[160];
-                            short[] outNsData = new short[160];
-                            short[] outAgcData = new short[160];
-                            ByteBuffer.wrap(output).order(ByteOrder.LITTLE_ENDIAN).asShortBuffer().get(inputData);
-                            nsUtils.nsxProcess(nsxId, inputData, 1, outNsData);
-                            agcUtils.agcProcess(agcId, outNsData, 1, 160, outAgcData,
-                                    0, 0, 0, false);
-                            byte[] outDatas = new byte[320];
-                            for (int i = 0; i < outAgcData.length; i++) {
-                                short outAgcDatum = outAgcData[i];
-                                byte high = (byte) ((0xFF00 & outAgcDatum) >> 8);//定义第一个byte
-                                byte low = (byte) (0x00FF & outAgcDatum);
-                                outDatas[i * 2 + 1] = high;
-                                outDatas[i * 2] = low;
-                            }
-                            FileIOUtils.writeFileFromBytesByStream(tmpFile, outDatas, true);
-                            index += 320;
-                        }
+                        processAudioData(byteBuffer, readSize, nsxId, agcId, bos);
                     }
                 }
+
                 audioRecord.stop();
                 files.add(tmpFile);
                 if (state == RecordState.STOP) {
@@ -377,11 +358,50 @@ public class RecordHelper {
             } catch (Exception e) {
                 Logger.e(e, TAG, e.getMessage());
                 notifyError("录音失败");
+            } finally {
+                // 状态重置与资源释放
+                if (state != RecordState.PAUSE) {
+                    state = RecordState.IDLE;
+                    notifyState();
+                    Logger.d(TAG, "录音结束");
+                }
             }
-            if (state != RecordState.PAUSE) {
-                state = RecordState.IDLE;
-                notifyState();
-                Logger.d(TAG, "录音结束");
+        }
+
+        /**
+         * 处理音频数据块（支持非完整块）
+         */
+        private void processAudioData(byte[] buffer, int validLength,
+                                      long nsxId, long agcId,
+                                      BufferedOutputStream outputStream) throws IOException {
+            int processed = 0;
+            while (processed < validLength) {
+                // 1. 计算当前块大小（支持末尾不完整块）
+                int blockSize = Math.min(320, validLength - processed);
+                int shortsToFill = blockSize / 2;
+
+                // 2. 填充输入缓冲（自动补零）
+                ByteBuffer.wrap(buffer, processed, blockSize)
+                        .order(ByteOrder.LITTLE_ENDIAN)
+                        .asShortBuffer()
+                        .get(mInputShorts, 0, shortsToFill);
+                if (shortsToFill < 160) {
+                    Arrays.fill(mInputShorts, shortsToFill, 160, (short) 0);
+                }
+
+                // 3. 执行降噪和增益处理
+                nsUtils.nsxProcess(nsxId, mInputShorts, 1, mNsOutput);
+                agcUtils.agcProcess(agcId, mNsOutput, 1, 160, mAgcOutput, 0, 0, 0, false);
+
+                // 4. 转换为字节（优化点：使用 ByteBuffer 替代手动转换）
+                ByteBuffer.wrap(mProcessBuffer)
+                        .order(ByteOrder.LITTLE_ENDIAN)
+                        .asShortBuffer()
+                        .put(mAgcOutput);
+
+                // 5. 写入文件（只写入有效数据长度）
+                outputStream.write(mProcessBuffer, 0, blockSize);
+                processed += blockSize;
             }
         }
     }
