@@ -125,7 +125,7 @@ https://www.jianshu.com/p/c0222de2faed
 ### 结合仓库，进行降噪 https://github.com/inodevip/WebRtcNsAgcModel
 
 ### Demo
-![Demo.png](https://raw.githubusercontent.com/zhaolewei/ZlwAudioRecorder/master/doc/demo.png)
+![Demo.png](https://github.com/yangfeng1994/ZlwAudioRecorder/blob/master/doc/demo.png)
 * 演示视频>>> https://www.bilibili.com/video/av48748708?from=search&seid=7409882966117066343
 
 
