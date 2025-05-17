@@ -294,6 +294,7 @@ public class RecordHelper {
         private void startMp3Recorder() {
             state = RecordState.RECORDING;
             notifyState();
+            boolean denoise = currentConfig.isDenoise();
             Pair<Long, Long> result = getInitNoise();
             Long nsxId = result.first;
             Long agcId = result.second;
@@ -305,9 +306,10 @@ public class RecordHelper {
                     int readCount = audioRecord.read(rawBuffer, 0, rawBuffer.length);
                     if (readCount > 0) {
                         notifyData(ByteUtils.toBytes(rawBuffer));
-                        // 关键优化：原地降噪处理
-                        processForMp3(rawBuffer, readCount, nsxId, agcId);
-
+                        if (denoise) {
+                            // 关键优化：原地降噪处理
+                            processForMp3(rawBuffer, readCount, nsxId, agcId);
+                        }
                         // 传递给MP3编码器
                         if (mp3EncodeThread != null) {
                             mp3EncodeThread.addChangeBuffer(
@@ -370,14 +372,30 @@ public class RecordHelper {
                 Long nsxId = result.first;
                 Long agcId = result.second;
                 byte[] byteBuffer = new byte[bufferSize]; // 主录音缓冲区
+                // 新增：刷新计数器（每处理8次刷新一次，约64KB数据）
+                int flushInterval = 8;
+                int writeCounter = 0;
                 while (state == RecordState.RECORDING) {
                     int readSize = audioRecord.read(byteBuffer, 0, byteBuffer.length);
                     notifyData(byteBuffer);
                     if (readSize > 0) {
-                        processAudioData(byteBuffer, readSize, nsxId, agcId, bos);
+                        if (currentConfig.isDenoise()) {
+                            // 关键优化：原地降噪处理
+                            processAudioData(byteBuffer, readSize, nsxId, agcId, bos);
+                        } else {
+                            bos.write(byteBuffer, 0, readSize);
+                        }
+                        // 统一刷新逻辑（降噪与非降噪共用）
+                        if (++writeCounter % flushInterval == 0) {
+                            bos.flush(); // 每处理64KB数据刷新一次
+                            writeCounter = 0;
+                        }
                     }
                 }
-
+                try {
+                    bos.flush();
+                } catch (Exception ignored) {
+                }
                 audioRecord.stop();
                 files.add(tmpFile);
                 if (state == RecordState.STOP) {
@@ -399,14 +417,18 @@ public class RecordHelper {
         }
 
         private Pair<Long, Long> getInitNoise() {
-            // 初始化音频处理器
-            long nsxId = nsUtils.nsxCreate();
-            nsUtils.nsxInit(nsxId, 16000);
-            nsUtils.nsxSetPolicy(nsxId, 2);
-            long agcId = agcUtils.agcCreate();
-            agcUtils.agcInit(agcId, 0, 255, 3, 16000);
-            agcUtils.agcSetConfig(agcId, (short) 9, (short) 9, true);
-            return new Pair(nsxId, agcId);
+            if (currentConfig.isDenoise()) {
+                // 初始化音频处理器
+                long nsxId = nsUtils.nsxCreate();
+                nsUtils.nsxInit(nsxId, 16000);
+                nsUtils.nsxSetPolicy(nsxId, 2);
+                long agcId = agcUtils.agcCreate();
+                agcUtils.agcInit(agcId, 0, 255, 3, 16000);
+                agcUtils.agcSetConfig(agcId, (short) 9, (short) 9, true);
+                return new Pair(nsxId, agcId);
+            } else {
+                return new Pair(0L, 0L);
+            }
         }
 
         /**
