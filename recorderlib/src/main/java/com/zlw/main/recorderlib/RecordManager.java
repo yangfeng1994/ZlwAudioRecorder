@@ -78,6 +78,10 @@ public class RecordManager {
         RecordService.pauseRecording(context);
     }
 
+    public static void setDenoise(boolean denoise) {
+        RecordService.setDenoise(denoise);
+    }
+
     /**
      * 录音状态监听回调
      */

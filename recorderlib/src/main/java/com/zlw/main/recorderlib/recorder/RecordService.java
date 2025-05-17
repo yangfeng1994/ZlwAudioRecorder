@@ -141,6 +141,10 @@ public class RecordService extends Service {
         currentConfig.setRecordDir(recordDir);
     }
 
+    public static void setDenoise(boolean denoise) {
+        currentConfig.setDenoise(denoise);
+    }
+
     /**
      * 获取当前的录音状态
      */

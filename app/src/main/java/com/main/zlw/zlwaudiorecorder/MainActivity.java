@@ -41,6 +41,7 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
     RadioGroup rgAudioFormat;
     RadioGroup rgSimpleRate;
     RadioGroup tbEncoding;
+    RadioGroup tbNoice;
     AudioView audioView;
     Spinner spUpStyle;
     Spinner spDownStyle;
@@ -58,9 +59,6 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
         initAudioView();
         initEvent();
         initRecord();
-       boolean hasPerm= AndPermission.hasPermissions(this, Permission.READ_EXTERNAL_STORAGE, Permission.WRITE_EXTERNAL_STORAGE,
-                Permission.RECORD_AUDIO);
-       Logger.d("yyyyyy"," hasPerm  "+hasPerm);
         AndPermission.with(this)
                 .runtime()
                 .permission(new String[]{Permission.READ_EXTERNAL_STORAGE, Permission.WRITE_EXTERNAL_STORAGE,
@@ -76,6 +74,7 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
         rgAudioFormat = findViewById(R.id.rgAudioFormat);
         rgSimpleRate = findViewById(R.id.rgSimpleRate);
         tbEncoding = findViewById(R.id.tbEncoding);
+        tbNoice = findViewById(R.id.tbNoice);
         audioView = findViewById(R.id.audioView);
         spUpStyle = findViewById(R.id.spUpStyle);
         spDownStyle = findViewById(R.id.spDownStyle);
@@ -143,19 +142,29 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
             }
         });
 
-        tbEncoding.setOnCheckedChangeListener(new RadioGroup.OnCheckedChangeListener() {
-            @Override
-            public void onCheckedChanged(RadioGroup group, int checkedId) {
-                switch (checkedId) {
-                    case R.id.rb8Bit:
-                        recordManager.changeRecordConfig(recordManager.getRecordConfig().setEncodingConfig(AudioFormat.ENCODING_PCM_8BIT));
-                        break;
-                    case R.id.rb16Bit:
-                        recordManager.changeRecordConfig(recordManager.getRecordConfig().setEncodingConfig(AudioFormat.ENCODING_PCM_16BIT));
-                        break;
-                    default:
-                        break;
-                }
+        tbEncoding.setOnCheckedChangeListener((group, checkedId) -> {
+            switch (checkedId) {
+                case R.id.rb8Bit:
+                    recordManager.changeRecordConfig(recordManager.getRecordConfig().setEncodingConfig(AudioFormat.ENCODING_PCM_8BIT));
+                    break;
+                case R.id.rb16Bit:
+                    recordManager.changeRecordConfig(recordManager.getRecordConfig().setEncodingConfig(AudioFormat.ENCODING_PCM_16BIT));
+                    break;
+                default:
+                    break;
+            }
+        });
+
+        tbNoice.setOnCheckedChangeListener((group, checkedId) -> {
+            switch (checkedId) {
+                case R.id.rbDeNoise:
+                    RecordManager.setDenoise(true);
+                    break;
+                case R.id.rbNoDenoise:
+                    RecordManager.setDenoise(false);
+                    break;
+                default:
+                    break;
             }
         });
     }

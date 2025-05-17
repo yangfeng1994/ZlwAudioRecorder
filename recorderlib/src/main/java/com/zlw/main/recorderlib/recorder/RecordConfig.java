@@ -179,7 +179,7 @@ public class RecordConfig implements Serializable {
 
     @Override
     public String toString() {
-        return String.format(Locale.getDefault(), "录制格式： %s,采样率：%sHz,位宽：%s bit,声道数：%s,是否降噪：%s", format, sampleRate, getEncoding(), getChannelCount(),denoise);
+        return String.format(Locale.getDefault(), "录制格式： %s,采样率：%sHz,位宽：%s bit,声道数：%s,是否降噪：%s", format, sampleRate, getEncoding(), getChannelCount(), denoise);
     }
 
     public enum RecordFormat {

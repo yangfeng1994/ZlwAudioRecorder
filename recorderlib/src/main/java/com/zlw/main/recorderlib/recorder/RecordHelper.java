@@ -4,11 +4,8 @@ import android.media.AudioRecord;
 import android.media.MediaRecorder;
 import android.os.Handler;
 import android.os.Looper;
-import android.util.Log;
 import android.util.Pair;
 
-import com.blankj.utilcode.util.ArrayUtils;
-import com.blankj.utilcode.util.FileIOUtils;
 import com.hank.voice.AutomaticGainControl;
 import com.hank.voice.NoiseSuppressor;
 import com.zlw.main.recorderlib.recorder.listener.RecordDataListener;

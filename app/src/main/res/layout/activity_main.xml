@@ -137,6 +137,38 @@
             android:text="16Bit" />
     </RadioGroup>
 
+    <TextView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="是否降噪：" />
+
+    <RadioGroup
+        android:id="@+id/tbNoice"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal">
+
+        <RadioButton
+            android:id="@+id/rbDeNoise"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:checked="true"
+            android:paddingEnd="20dp"
+            android:text="降噪" />
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="(必须是16000Hz与 16Bit)" />
+
+        <RadioButton
+            android:id="@+id/rbNoDenoise"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:paddingEnd="20dp"
+            android:text="不降噪" />
+    </RadioGroup>
+
     <View
         android:layout_width="match_parent"
         android:layout_height="1dp"

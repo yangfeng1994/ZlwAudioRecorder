@@ -122,6 +122,8 @@ https://www.jianshu.com/p/c0222de2faed
     RecordManager.getInstance().stop();
     ```    
 
+### 结合仓库，进行降噪 https://github.com/inodevip/WebRtcNsAgcModel
+
 ### Demo
 ![Demo.png](https://raw.githubusercontent.com/zhaolewei/ZlwAudioRecorder/master/doc/demo.jpg)
 * 演示视频>>> https://www.bilibili.com/video/av48748708?from=search&seid=7409882966117066343
