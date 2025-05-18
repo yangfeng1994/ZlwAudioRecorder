@@ -292,7 +292,8 @@ public class RecordHelper {
             state = RecordState.RECORDING;
             notifyState();
             boolean denoise = currentConfig.isDenoise();
-            Pair<Long, Long> result = getInitNoise();
+            Logger.d(TAG, "开始录制 mp3，降噪 " + denoise);
+            Pair<Long, Long> result = getInitNoise(denoise);
             Long nsxId = result.first;
             Long agcId = result.second;
             try {
@@ -359,15 +360,15 @@ public class RecordHelper {
         private void startPcmRecorder() {
             state = RecordState.RECORDING;
             notifyState();
-            Logger.d(TAG, "开始录制 Pcm");
-
+            boolean denoise = currentConfig.isDenoise();
+            Logger.d(TAG, "开始录制 Pcm，降噪 " + denoise);
+            Pair<Long, Long> result = getInitNoise(denoise);
+            Long nsxId = result.first;
+            Long agcId = result.second;
             // 使用 BufferedOutputStream 提升写入性能（缓冲区大小8KB）
             try (BufferedOutputStream bos = new BufferedOutputStream(
                     new FileOutputStream(tmpFile), 8192)) {
                 audioRecord.startRecording();
-                Pair<Long, Long> result = getInitNoise();
-                Long nsxId = result.first;
-                Long agcId = result.second;
                 byte[] byteBuffer = new byte[bufferSize]; // 主录音缓冲区
                 // 新增：刷新计数器（每处理8次刷新一次，约64KB数据）
                 int flushInterval = 8;
@@ -376,7 +377,7 @@ public class RecordHelper {
                     int readSize = audioRecord.read(byteBuffer, 0, byteBuffer.length);
                     notifyData(byteBuffer);
                     if (readSize > 0) {
-                        if (currentConfig.isDenoise()) {
+                        if (denoise) {
                             // 关键优化：原地降噪处理
                             processAudioData(byteBuffer, readSize, nsxId, agcId, bos);
                         } else {
@@ -404,6 +405,9 @@ public class RecordHelper {
                 Logger.e(e, TAG, e.getMessage());
                 notifyError("录音失败");
             } finally {
+                // 释放资源
+                nsUtils.nsxFree(nsxId);
+                agcUtils.agcFree(agcId);
                 // 状态重置与资源释放
                 if (state != RecordState.PAUSE) {
                     state = RecordState.IDLE;
@@ -413,8 +417,8 @@ public class RecordHelper {
             }
         }
 
-        private Pair<Long, Long> getInitNoise() {
-            if (currentConfig.isDenoise()) {
+        private Pair<Long, Long> getInitNoise(boolean denoise) {
+            if (denoise) {
                 // 初始化音频处理器
                 long nsxId = nsUtils.nsxCreate();
                 nsUtils.nsxInit(nsxId, 16000);
@@ -422,9 +426,9 @@ public class RecordHelper {
                 long agcId = agcUtils.agcCreate();
                 agcUtils.agcInit(agcId, 0, 255, 3, 16000);
                 agcUtils.agcSetConfig(agcId, (short) 9, (short) 9, true);
-                return new Pair(nsxId, agcId);
+                return new Pair<>(nsxId, agcId);
             } else {
-                return new Pair(0L, 0L);
+                return new Pair<>(0L, 0L);
             }
         }
 
