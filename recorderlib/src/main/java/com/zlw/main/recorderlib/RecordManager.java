@@ -78,7 +78,7 @@ public class RecordManager {
         RecordService.pauseRecording(context);
     }
 
-    public static void setDenoise(boolean denoise) {
+    public  void setDenoise(boolean denoise) {
         RecordService.setDenoise(denoise);
     }
 

@@ -15,7 +15,7 @@ https://www.jianshu.com/p/c0222de2faed
 [![](https://jitpack.io/v/zhaolewei/ZlwAudioRecorder.svg)](https://jitpack.io/#zhaolewei/ZlwAudioRecorder)
 
     dependencies {
-	        implementation 'com.github.zhaolewei:ZlwAudioRecorder:v1.08'
+	        implementation 'com.github.yangfeng1994:ZlwAudioRecorder:v2.0.6'
 	}
 
     allprojects {
@@ -122,7 +122,12 @@ https://www.jianshu.com/p/c0222de2faed
     RecordManager.getInstance().stop();
     ```    
 
-### 结合仓库，进行降噪 https://github.com/inodevip/WebRtcNsAgcModel
+* 降噪,默认开启降噪
+    ```java
+    RecordManager.getInstance().setDenoise(true);
+    ```    
+  
+### 结合webrtc抽离仓库，进行降噪 https://github.com/inodevip/WebRtcNsAgcModel
 
 ### Demo
 ![Demo.png](https://github.com/yangfeng1994/ZlwAudioRecorder/blob/master/doc/demo.png)

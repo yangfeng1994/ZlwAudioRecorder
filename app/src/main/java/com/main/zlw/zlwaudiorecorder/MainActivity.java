@@ -158,10 +158,10 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
         tbNoice.setOnCheckedChangeListener((group, checkedId) -> {
             switch (checkedId) {
                 case R.id.rbDeNoise:
-                    RecordManager.setDenoise(true);
+                    recordManager.setDenoise(true);
                     break;
                 case R.id.rbNoDenoise:
-                    RecordManager.setDenoise(false);
+                    recordManager.setDenoise(false);
                     break;
                 default:
                     break;
