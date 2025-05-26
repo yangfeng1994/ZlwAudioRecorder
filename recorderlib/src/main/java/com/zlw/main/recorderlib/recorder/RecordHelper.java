@@ -291,9 +291,8 @@ public class RecordHelper {
         private void startMp3Recorder() {
             state = RecordState.RECORDING;
             notifyState();
-            boolean denoise = currentConfig.isDenoise();
-            Logger.d(TAG, "开始录制 mp3，降噪 " + denoise);
-            Pair<Long, Long> result = getInitNoise(denoise);
+            Logger.d(TAG, "开始录制 mp3");
+            Pair<Long, Long> result = getInitNoise();
             Long nsxId = result.first;
             Long agcId = result.second;
             try {
@@ -304,7 +303,7 @@ public class RecordHelper {
                     int readCount = audioRecord.read(rawBuffer, 0, rawBuffer.length);
                     if (readCount > 0) {
                         notifyData(ByteUtils.toBytes(rawBuffer));
-                        if (denoise) {
+                        if (currentConfig.isDenoise()) {
                             // 关键优化：原地降噪处理
                             processForMp3(rawBuffer, readCount, nsxId, agcId);
                         }
@@ -360,9 +359,8 @@ public class RecordHelper {
         private void startPcmRecorder() {
             state = RecordState.RECORDING;
             notifyState();
-            boolean denoise = currentConfig.isDenoise();
-            Logger.d(TAG, "开始录制 Pcm，降噪 " + denoise);
-            Pair<Long, Long> result = getInitNoise(denoise);
+            Logger.d(TAG, "开始录制 Pcm");
+            Pair<Long, Long> result = getInitNoise();
             Long nsxId = result.first;
             Long agcId = result.second;
             // 使用 BufferedOutputStream 提升写入性能（缓冲区大小8KB）
@@ -377,7 +375,7 @@ public class RecordHelper {
                     int readSize = audioRecord.read(byteBuffer, 0, byteBuffer.length);
                     notifyData(byteBuffer);
                     if (readSize > 0) {
-                        if (denoise) {
+                        if (currentConfig.isDenoise()) {
                             // 关键优化：原地降噪处理
                             processAudioData(byteBuffer, readSize, nsxId, agcId, bos);
                         } else {
@@ -417,19 +415,15 @@ public class RecordHelper {
             }
         }
 
-        private Pair<Long, Long> getInitNoise(boolean denoise) {
-            if (denoise) {
-                // 初始化音频处理器
-                long nsxId = nsUtils.nsxCreate();
-                nsUtils.nsxInit(nsxId, 16000);
-                nsUtils.nsxSetPolicy(nsxId, 2);
-                long agcId = agcUtils.agcCreate();
-                agcUtils.agcInit(agcId, 0, 255, 3, 16000);
-                agcUtils.agcSetConfig(agcId, (short) 9, (short) 9, true);
-                return new Pair<>(nsxId, agcId);
-            } else {
-                return new Pair<>(0L, 0L);
-            }
+        private Pair<Long, Long> getInitNoise() {
+            // 初始化音频处理器
+            long nsxId = nsUtils.nsxCreate();
+            nsUtils.nsxInit(nsxId, 16000);
+            nsUtils.nsxSetPolicy(nsxId, 2);
+            long agcId = agcUtils.agcCreate();
+            agcUtils.agcInit(agcId, 0, 255, 3, 16000);
+            agcUtils.agcSetConfig(agcId, (short) 9, (short) 9, true);
+            return new Pair<>(nsxId, agcId);
         }
 
         /**
