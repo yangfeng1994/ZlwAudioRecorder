@@ -78,12 +78,16 @@ public class RecordManager {
         RecordService.pauseRecording(context);
     }
 
-    public  void setDenoise(boolean denoise) {
+    public void setDenoise(boolean denoise) {
         RecordService.setDenoise(denoise);
     }
 
-    public  void setAudioSource(int audioSource) {
+    public void setAudioSource(int audioSource) {
         RecordService.setAudioSource(audioSource);
+    }
+
+    public int getAudioSource() {
+        return RecordService.getAudioSource();
     }
 
     /**

@@ -1,14 +1,18 @@
 package com.main.zlw.zlwaudiorecorder;
 
+import android.annotation.SuppressLint;
 import android.content.Intent;
 import android.media.AudioFormat;
 import android.media.MediaRecorder;
 import android.os.Bundle;
 import android.os.Environment;
+import android.util.Log;
+import android.view.MotionEvent;
 import android.view.View;
 import android.widget.AdapterView;
 import android.widget.ArrayAdapter;
 import android.widget.Button;
+import android.widget.RadioButton;
 import android.widget.RadioGroup;
 import android.widget.Spinner;
 import android.widget.TextView;
@@ -44,6 +48,8 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
     RadioGroup tbEncoding;
     RadioGroup tbNoice;
     RadioGroup tbSource;
+    RadioButton rbMobileAndExt;
+    RadioButton tbExt;
     AudioView audioView;
     Spinner spUpStyle;
     Spinner spDownStyle;
@@ -81,6 +87,8 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
         spUpStyle = findViewById(R.id.spUpStyle);
         spDownStyle = findViewById(R.id.spDownStyle);
         tbSource = findViewById(R.id.tbSource);
+        rbMobileAndExt = findViewById(R.id.rbMobileAndExt);
+        tbExt = findViewById(R.id.tbExt);
     }
 
     @Override
@@ -170,21 +178,64 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
                     break;
             }
         });
+
+        final boolean[] isUserChecked = {false};
+
+        @SuppressLint("ClickableViewAccessibility") View.OnTouchListener touchListener = (v, event) -> {
+            if (event.getAction() == MotionEvent.ACTION_DOWN) {
+                isUserChecked[0] = true;
+            }
+            return false; // 返回 false，让点击事件继续传递
+        };
+
+        // 假设你的按钮是这两个
+        findViewById(R.id.rbMobileAndExt).setOnTouchListener(touchListener);
+        findViewById(R.id.tbExt).setOnTouchListener(touchListener);
+
         tbSource.setOnCheckedChangeListener((group, checkedId) -> {
+            if (!isUserChecked[0]) {
+                // 是代码触发，不做处理
+                return;
+            }
+            isUserChecked[0] = false; // 重置标记位
+
+            Log.i("yyyyyy", "✅ 用户点击触发 checkedId=" + checkedId);
+
             switch (checkedId) {
                 case R.id.rbMobileAndExt:
+                    if (recordManager.getAudioSource() == MediaRecorder.AudioSource.MIC) {
+                        tbSource.check(R.id.tbExt);
+                        return;
+                    }
+                    if (isRecording()) {
+                        tbSource.check(R.id.tbExt);
+                        Toast.makeText(MainActivity.this, "录音过程中无法切换音频源", Toast.LENGTH_SHORT).show();
+                        return;
+                    }
                     recordManager.setAudioSource(MediaRecorder.AudioSource.MIC);
                     break;
+
                 case R.id.tbExt:
+                    if (recordManager.getAudioSource() == MediaRecorder.AudioSource.VOICE_COMMUNICATION) {
+                        tbSource.check(R.id.rbMobileAndExt);
+                        return;
+                    }
+                    if (isRecording()) {
+                        tbSource.check(R.id.rbMobileAndExt);
+                        Toast.makeText(MainActivity.this, "录音过程中无法切换音频源", Toast.LENGTH_SHORT).show();
+                        return;
+                    }
                     recordManager.setAudioSource(MediaRecorder.AudioSource.VOICE_COMMUNICATION);
                     break;
-//                case R.id.mRbMobile:
-//                    recordManager.setAudioSource(MediaRecorder.AudioSource.VOICE_RECOGNITION);
-//                    break;
+
                 default:
                     break;
             }
         });
+    }
+
+    public boolean isRecording() {
+        return recordManager.getState() == RecordHelper.RecordState.RECORDING;
     }
 
     private void initRecord() {
@@ -257,8 +308,6 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
             case R.id.btStop:
                 doStop();
                 break;
-            case R.id.jumpTestActivity:
-                startActivity(new Intent(this, TestHzActivity.class));
             default:
                 break;
         }

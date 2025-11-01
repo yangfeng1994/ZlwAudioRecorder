@@ -150,6 +150,10 @@ public class RecordService extends Service {
         currentConfig.setAudioSource(audioSource);
     }
 
+    public static int getAudioSource() {
+        return currentConfig.getAudioSource();
+    }
+
     /**
      * 获取当前的录音状态
      */
