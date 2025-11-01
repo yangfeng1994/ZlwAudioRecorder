@@ -2,6 +2,7 @@ package com.main.zlw.zlwaudiorecorder;
 
 import android.content.Intent;
 import android.media.AudioFormat;
+import android.media.MediaRecorder;
 import android.os.Bundle;
 import android.os.Environment;
 import android.view.View;
@@ -42,6 +43,7 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
     RadioGroup rgSimpleRate;
     RadioGroup tbEncoding;
     RadioGroup tbNoice;
+    RadioGroup tbSource;
     AudioView audioView;
     Spinner spUpStyle;
     Spinner spDownStyle;
@@ -78,6 +80,7 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
         audioView = findViewById(R.id.audioView);
         spUpStyle = findViewById(R.id.spUpStyle);
         spDownStyle = findViewById(R.id.spDownStyle);
+        tbSource = findViewById(R.id.tbSource);
     }
 
     @Override
@@ -163,6 +166,21 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
                 case R.id.rbNoDenoise:
                     recordManager.setDenoise(false);
                     break;
+                default:
+                    break;
+            }
+        });
+        tbSource.setOnCheckedChangeListener((group, checkedId) -> {
+            switch (checkedId) {
+                case R.id.rbMobileAndExt:
+                    recordManager.setAudioSource(MediaRecorder.AudioSource.MIC);
+                    break;
+                case R.id.tbExt:
+                    recordManager.setAudioSource(MediaRecorder.AudioSource.VOICE_COMMUNICATION);
+                    break;
+//                case R.id.mRbMobile:
+//                    recordManager.setAudioSource(MediaRecorder.AudioSource.VOICE_RECOGNITION);
+//                    break;
                 default:
                     break;
             }

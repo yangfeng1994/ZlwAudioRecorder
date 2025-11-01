@@ -82,6 +82,10 @@ public class RecordManager {
         RecordService.setDenoise(denoise);
     }
 
+    public  void setAudioSource(int audioSource) {
+        RecordService.setAudioSource(audioSource);
+    }
+
     /**
      * 录音状态监听回调
      */

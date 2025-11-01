@@ -145,6 +145,11 @@ public class RecordService extends Service {
         currentConfig.setDenoise(denoise);
     }
 
+
+    public static void setAudioSource(int audioSource) {
+        currentConfig.setAudioSource(audioSource);
+    }
+
     /**
      * 获取当前的录音状态
      */

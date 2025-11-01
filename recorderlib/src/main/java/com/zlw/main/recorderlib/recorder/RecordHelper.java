@@ -1,5 +1,6 @@
 package com.zlw.main.recorderlib.recorder;
 
+import android.annotation.SuppressLint;
 import android.media.AudioRecord;
 import android.media.MediaRecorder;
 import android.os.Handler;
@@ -118,6 +119,16 @@ public class RecordHelper {
         audioRecordThread.start();
     }
 
+    private void stopAudioRecordThread() {
+        if (null != audioRecordThread) {
+            try {
+                audioRecordThread.interrupt();
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
+        }
+    }
+
     public void stop() {
         if (state == RecordState.IDLE) {
             Logger.e(TAG, "状态异常当前状态： %s", state.name());
@@ -133,6 +144,7 @@ public class RecordHelper {
             state = RecordState.STOP;
             notifyState();
         }
+        stopAudioRecordThread();
     }
 
     void pause() {
@@ -142,6 +154,7 @@ public class RecordHelper {
         }
         state = RecordState.PAUSE;
         notifyState();
+        stopAudioRecordThread();
     }
 
     void resume() {
@@ -259,11 +272,12 @@ public class RecordHelper {
         private final short[] mInputShorts = new short[160];  // 输入缓冲
         private final byte[] mProcessBuffer = new byte[320]; // 字节转换缓冲
 
+        @SuppressLint("MissingPermission")
         AudioRecordThread() {
             bufferSize = AudioRecord.getMinBufferSize(currentConfig.getSampleRate(),
                     currentConfig.getChannelConfig(), currentConfig.getEncodingConfig()) * RECORD_AUDIO_BUFFER_TIMES;
             Logger.d(TAG, "record buffer size = %s", bufferSize);
-            audioRecord = new AudioRecord(MediaRecorder.AudioSource.MIC, currentConfig.getSampleRate(),
+            audioRecord = new AudioRecord(currentConfig.getAudioSource(), currentConfig.getSampleRate(),
                     currentConfig.getChannelConfig(), currentConfig.getEncodingConfig(), bufferSize);
             if (currentConfig.getFormat() == RecordConfig.RecordFormat.MP3) {
                 if (mp3EncodeThread == null) {
@@ -418,10 +432,10 @@ public class RecordHelper {
         private Pair<Long, Long> getInitNoise() {
             // 初始化音频处理器
             long nsxId = nsUtils.nsxCreate();
-            nsUtils.nsxInit(nsxId, 16000);
+            nsUtils.nsxInit(nsxId, currentConfig.getSampleRate());
             nsUtils.nsxSetPolicy(nsxId, 2);
             long agcId = agcUtils.agcCreate();
-            agcUtils.agcInit(agcId, 0, 255, 3, 16000);
+            agcUtils.agcInit(agcId, 0, 255, 3, currentConfig.getSampleRate());
             agcUtils.agcSetConfig(agcId, (short) 9, (short) 9, true);
             return new Pair<>(nsxId, agcId);
         }

@@ -1,6 +1,7 @@
 package com.zlw.main.recorderlib.recorder;
 
 import android.media.AudioFormat;
+import android.media.MediaRecorder;
 import android.os.Environment;
 
 import java.io.Serializable;
@@ -29,6 +30,9 @@ public class RecordConfig implements Serializable {
      */
     private int sampleRate = 16000;
 
+    //音频源
+    private int audioSource = MediaRecorder.AudioSource.MIC;
+
     //是否降噪
     private boolean denoise = true;
 
@@ -56,16 +60,17 @@ public class RecordConfig implements Serializable {
      *                       16Bit: See {@link AudioFormat#ENCODING_PCM_16BIT},
      * @param sampleRate     采样率 hz: 8000/16000/44100
      */
-    public RecordConfig(RecordFormat format, int channelConfig, int encodingConfig, int sampleRate) {
-        this(format, channelConfig, encodingConfig, sampleRate, true);
+    public RecordConfig(RecordFormat format, int channelConfig, int encodingConfig, int sampleRate,int audioSource) {
+        this(format, channelConfig, encodingConfig, sampleRate, true, audioSource);
     }
 
-    public RecordConfig(RecordFormat format, int channelConfig, int encodingConfig, int sampleRate, boolean denoise) {
+    public RecordConfig(RecordFormat format, int channelConfig, int encodingConfig, int sampleRate, boolean denoise, int audioSource) {
         this.format = format;
         this.channelConfig = channelConfig;
         this.encodingConfig = encodingConfig;
         this.sampleRate = sampleRate;
         this.denoise = denoise;
+        this.audioSource = audioSource;
     }
 
 
@@ -158,6 +163,15 @@ public class RecordConfig implements Serializable {
         return this;
     }
 
+    public int getAudioSource() {
+        return audioSource;
+    }
+
+    public RecordConfig setAudioSource(int audioSource) {
+        this.audioSource = audioSource;
+        return this;
+    }
+
     public int getSampleRate() {
         return sampleRate;
     }
@@ -179,7 +193,7 @@ public class RecordConfig implements Serializable {
 
     @Override
     public String toString() {
-        return String.format(Locale.getDefault(), "录制格式： %s,采样率：%sHz,位宽：%s bit,声道数：%s,是否降噪：%s", format, sampleRate, getEncoding(), getChannelCount(), denoise);
+        return String.format(Locale.getDefault(), "录制格式： %s,采样率：%sHz,位宽：%s bit,声道数：%s,是否降噪：%s,音源：%s", format, sampleRate, getEncoding(), getChannelCount(), denoise,getAudioSource());
     }
 
     public enum RecordFormat {
